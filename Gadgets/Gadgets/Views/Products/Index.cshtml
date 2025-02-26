@@ -1,0 +1,90 @@
+@model IEnumerable<Product>
+
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2>Products</h2>
+        </div>
+        <div class="col-auto">
+            <div class="btn-group">
+                <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                    Filter by Category
+                </button>
+                <div class="dropdown-menu">
+                    <a class="dropdown-item" href="@Url.Action("Index")">All</a>
+                    @foreach (var category in Model.Select(p => p.Category).Distinct())
+                    {
+                        <a class="dropdown-item" href="@Url.Action("Index", new { category })">@category</a>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row row-cols-1 row-cols-md-3 g-4">
+        @foreach (var product in Model)
+        {
+            <div class="col">
+                <div class="card h-100">
+                    <img src="@product.ImageUrl" class="card-img-top" alt="@product.Name" style="height: 200px; object-fit: cover;">
+                    <div class="card-body">
+                        <h5 class="card-title">@product.Name</h5>
+                        <p class="card-text">@product.Description</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="h5 mb-0">@product.Price.ToString("C")</span>
+                            @if (product.IsMemberOnly)
+                            {
+                                <span class="badge bg-warning">Members Only</span>
+                            }
+                        </div>
+                        @if (product.Reviews.Any())
+                        {
+                            <div class="mt-2">
+                                @for (int i = 1; i <= 5; i++)
+                                {
+                                    if (i <= product.AverageRating)
+                                    {
+                                        <i class="fas fa-star text-warning"></i>
+                                    }
+                                    else
+                                    {
+                                        <i class="far fa-star text-warning"></i>
+                                    }
+                                }
+                                <small class="text-muted">(@product.Reviews.Count reviews)</small>
+                            </div>
+                        }
+                    </div>
+                    <div class="card-footer">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <button class="btn btn-primary add-to-cart" 
+                                    data-product-id="@product.Id"
+                                    onclick="addToCart(@product.Id)">
+                                Add to Cart
+                            </button>
+                            <small class="text-muted">@product.PurchasePoints points</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function addToCart(productId) {
+            $.post('/Cart/AddToCart', { productId: productId })
+                .done(function(response) {
+                    if (response.success) {
+                        toastr.success(response.message);
+                    } else {
+                        toastr.error(response.message);
+                    }
+                })
+                .fail(function() {
+                    toastr.error('Failed to add product to cart');
+                });
+        }
+    </script>
+} 

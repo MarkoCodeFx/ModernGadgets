@@ -1,0 +1,146 @@
+@model Order
+@{
+    ViewData["Title"] = "Track Delivery";
+}
+
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
+@functions{
+    public string GetAntiXsrfRequestToken()
+    {
+        return Xsrf.GetAndStoreTokens(Context).RequestToken;
+    }
+}
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Delivery Tracking - Order #@Model.Id</h5>
+                </div>
+                <div class="card-body">
+                    <div id="map" style="height: 400px; width: 100%;"></div>
+                    <div class="mt-3">
+                        <h6>Delivery Status: <span id="deliveryStatus" class="badge badge-primary">@Model.OrderStatus</span></h6>
+                        <div class="progress mt-2" style="height: 20px;">
+                            <div id="deliveryProgress" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Order Details</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Order Date:</strong> @Model.OrderDate.ToString("MMM dd, yyyy")</p>
+                    <p><strong>Total Amount:</strong> $@Model.TotalAmount.ToString("N2")</p>
+                    <p><strong>Shipping Address:</strong> @Model.ShippingAddress</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+}
+
+@section Scripts {
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        let map;
+        let driverMarker;
+        let destinationMarker;
+        let deliveryComplete = false;
+        const deliveryDuration = 10000; // 10 seconds
+        let startTime;
+
+        function initMap() {
+            const center = [51.5074, -0.1278];
+            map = L.map('map').setView(center, 13);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            destinationMarker = L.marker([51.5074, -0.1278], {
+                title: 'Delivery Location'
+            }).addTo(map);
+
+            driverMarker = L.marker([51.5074 - 0.1, -0.1278 - 0.1], {
+                title: 'Driver Location'
+            }).addTo(map);
+
+            startDeliverySimulation();
+        }
+
+        function startDeliverySimulation() {
+            startTime = Date.now();
+            updateDriverLocation();
+        }
+
+        function updateDriverLocation() {
+            if (deliveryComplete) return;
+
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(elapsed / deliveryDuration * 100, 100);
+
+            $('#deliveryProgress').css('width', progress + '%');
+
+            if (progress >= 100) {
+                deliveryComplete = true;
+                completeDelivery();
+                return;
+            }
+
+            $.get(`/Orders/GetDriverLocation/${@Model.Id}`)
+                .done(function(response) {
+                    driverMarker.setLatLng([response.lat, response.lng]);
+                });
+
+            setTimeout(updateDriverLocation, 1000);
+        }
+
+        function completeDelivery() {
+            $.ajax({
+                url: `/Orders/UpdateOrderStatus/${@Model.Id}`,
+                type: 'POST',
+                headers: {
+                    "RequestVerificationToken": "@GetAntiXsrfRequestToken()"
+                },
+                success: function(response) {
+                    if (response.success) {
+                        $('#deliveryStatus')
+                            .removeClass('badge-primary')
+                            .addClass('badge-success')
+                            .text('Delivered');
+
+                        toastr.success(response.message);
+                        
+                        setTimeout(function() {
+                            location.reload();
+                        }, 2000);
+                    } else {
+                        toastr.error(response.message);
+                        console.log('Error:', response.message);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    toastr.error('Failed to update delivery status');
+                    console.log('Error:', error);
+                    console.log('Status:', status);
+                    console.log('Response:', xhr.responseText);
+                }
+            });
+        }
+
+        $(document).ready(function() {
+            initMap();
+        });
+    </script>
+} 

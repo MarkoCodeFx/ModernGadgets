@@ -1,0 +1,119 @@
+@model IEnumerable<CartItem>
+
+<div class="container mt-4">
+    <h2>Shopping Cart</h2>
+
+    @if (!Model.Any())
+    {
+        <div class="alert alert-info">
+            Your cart is empty. <a asp-controller="Products" asp-action="Index">Continue shopping</a>
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-md-8">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Price</th>
+                                <th>Quantity</th>
+                                <th>Total</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in Model)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <img src="@item.Product.ImageUrl" alt="@item.Product.Name" style="width: 50px; height: 50px; object-fit: cover;" class="me-2">
+                                            <div>
+                                                <h6 class="mb-0">@item.Product.Name</h6>
+                                                <small class="text-muted">@item.Product.Category</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>@item.Product.Price.ToString("C")</td>
+                                    <td>@item.Quantity</td>
+                                    <td>@((item.Product.Price * item.Quantity).ToString("C"))</td>
+                                    <td>
+                                        <form asp-action="RemoveFromCart" method="post">
+                                            <input type="hidden" name="productId" value="@item.ProductId" />
+                                            <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Order Summary</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            @{
+                                var totalAmount = Model.Sum(i => 
+                                {
+                                    var discount = ViewBag.CurrentUser?.Membership?.Tier switch
+                                    {
+                                        MembershipTier.Gold => 0.15m,
+                                        MembershipTier.Silver => 0.10m,
+                                        MembershipTier.Bronze => 0.05m,
+                                        _ => 0m
+                                    };
+                                    return (i.Product.Price - (i.Product.Price * discount)) * i.Quantity;
+                                });
+                            }
+                            <strong>Total:</strong> $@totalAmount.ToString("N2")
+                            @if (ViewBag.CurrentUser?.Membership != null)
+                            {
+                                var originalTotal = Model.Sum(i => i.Product.Price * i.Quantity);
+                                var savings = originalTotal - totalAmount;
+                                <small class="text-success d-block">You save: $@savings.ToString("N2")</small>
+                            }
+                        </p>
+
+                        <form asp-controller="Checkout" asp-action="PlaceOrder" method="post">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-primary">Place Order</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            // Update quantity
+            $('.quantity-input').change(function() {
+                var input = $(this);
+                var productId = input.data('product-id');
+                var quantity = input.val();
+
+                $.post('/Cart/UpdateQuantity', { productId: productId, quantity: quantity })
+                    .done(function(response) {
+                        if (response.success) {
+                            location.reload();
+                        } else {
+                            alert('Failed to update quantity');
+                        }
+                    })
+                    .fail(function() {
+                        alert('Error updating quantity');
+                    });
+            });
+        });
+    </script>
+} 

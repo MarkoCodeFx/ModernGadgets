@@ -1,0 +1,234 @@
+@model IEnumerable<Order>
+
+<div class="container mt-4">
+    <h2>My Orders</h2>
+
+    @if (!Model.Any())
+    {
+        <div class="alert alert-info">
+            You haven't placed any orders yet. <a asp-controller="Products" asp-action="Index">Start shopping</a>
+        </div>
+    }
+    else
+    {
+        @foreach (var order in Model.OrderByDescending(o => o.OrderDate))
+        {
+            <div class="card mb-4">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-0">Order #@order.Id</h5>
+                            <small class="text-muted">Placed on @order.OrderDate.ToString("MMMM dd, yyyy")</small>
+                        </div>
+                        <div>
+                            <span class="badge badge-primary">@order.OrderStatus</span>
+                            <span class="ml-2">
+                                Total: $@order.TotalAmount.ToString("N2")
+                                @{
+                                    var originalTotal = order.OrderItems.Sum(i => i.OriginalPrice * i.Quantity);
+                                    var savings = originalTotal - order.TotalAmount;
+                                }
+                                @if (savings > 0)
+                                {
+                                    <small class="text-success d-block">Saved: $@savings.ToString("N2")</small>
+                                }
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    @foreach (var item in order.OrderItems)
+                    {
+                        <div class="row mb-3">
+                            <div class="col-md-2">
+                                <img src="@(string.IsNullOrEmpty(item.Product.ImageUrl) ? 
+                                    "https://images.unsplash.com/photo-1557862921-37829c790f19?auto=format&fit=crop&w=400&q=80" : 
+                                    item.Product.ImageUrl)" alt="@item.Product.Name" class="img-fluid rounded" style="max-width: 100px;">
+                            </div>
+                            <div class="col-md-6">
+                                <h6>
+                                    <a asp-controller="Products" asp-action="Details" asp-route-id="@item.ProductId">
+                                        @item.Product.Name
+                                    </a>
+                                </h6>
+                                <p class="text-muted mb-0">Quantity: @item.Quantity</p>
+                                <p class="mb-0">
+                                    @if (item.DiscountPercentage > 0)
+                                    {
+                                        <span class="text-muted text-decoration-line-through small">$@item.OriginalPrice.ToString("N2")</span>
+                                        <span class="text-primary">$@item.Price.ToString("N2")</span>
+                                        <span class="badge bg-danger ms-2">-@(item.DiscountPercentage * 100)%</span>
+                                    }
+                                    else
+                                    {
+                                        <span>$@item.Price.ToString("N2")</span>
+                                    }
+                                    <small class="text-muted">× @item.Quantity</small>
+                                    @if (item.DiscountPercentage > 0)
+                                    {
+                                        <small class="text-success d-block">
+                                            Saved: $@((item.OriginalPrice * item.Quantity - item.Price * item.Quantity).ToString("N2"))
+                                        </small>
+                                    }
+                                </p>
+                            </div>
+                            <div class="col-md-4 text-right" data-review-container="@item.ProductId">
+                                @{
+                                    var review = item.Product.Reviews.FirstOrDefault();
+                                }
+                                @if (review == null)
+                                {
+                                    <button type="button" 
+                                            class="btn btn-outline-primary" 
+                                            data-toggle="modal" 
+                                            data-target="#reviewModal-@item.ProductId">
+                                        Write a Review
+                                    </button>
+
+                                    <!-- Review Modal -->
+                                    <div class="modal fade" id="reviewModal-@item.ProductId" tabindex="-1" role="dialog">
+                                        <div class="modal-dialog" role="document">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Review @item.Product.Name</h5>
+                                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                        <span aria-hidden="true">&times;</span>
+                                                    </button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <form id="reviewForm-@item.ProductId" class="review-form">
+                                                        <input type="hidden" name="ProductId" value="@item.ProductId" />
+                                                        <div class="form-group">
+                                                            <label>Rating</label>
+                                                            <div class="rating">
+                                                                @for (int i = 5; i >= 1; i--)
+                                                                {
+                                                                    <input type="radio" name="Rating" value="@i" id="rating-@item.ProductId-@i" class="rating-input" required />
+                                                                    <label for="rating-@item.ProductId-@i" class="rating-label">☆</label>
+                                                                }
+                                                            </div>
+                                                        </div>
+                                                        <div class="form-group">
+                                                            <label>Comment</label>
+                                                            <textarea name="Comment" class="form-control" rows="3" required></textarea>
+                                                        </div>
+                                                        <button type="submit" class="btn btn-primary">Submit Review</button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="text-warning">
+                                        @for (int i = 1; i <= 5; i++)
+                                        {
+                                            if (i <= review.Rating)
+                                            {
+                                                <i class="fas fa-star"></i>
+                                            }
+                                            else
+                                            {
+                                                <i class="far fa-star"></i>
+                                            }
+                                        }
+                                    </div>
+                                    <small class="text-muted">You reviewed this product</small>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    }
+</div> 
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            // Handle review form submission
+            $('.review-form').submit(function(e) {
+                e.preventDefault();
+                var form = $(this);
+                var productId = form.find('input[name="ProductId"]').val();
+                var rating = form.find('input[name="Rating"]:checked').val();
+                var comment = form.find('textarea[name="Comment"]').val();
+
+                $.ajax({
+                    url: '/Review/Create',
+                    type: 'POST',
+                    data: {
+                        ProductId: productId,
+                        Rating: rating,
+                        Comment: comment
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            // Update the review container
+                            var reviewContainer = $(`[data-review-container="${productId}"]`);
+                            var starsHtml = '';
+                            for (var i = 1; i <= 5; i++) {
+                                if (i <= response.review.rating) {
+                                    starsHtml += '<i class="fas fa-star"></i>';
+                                } else {
+                                    starsHtml += '<i class="far fa-star"></i>';
+                                }
+                            }
+                            
+                            reviewContainer.html(`
+                                <div class="text-warning">
+                                    ${starsHtml}
+                                </div>
+                                <small class="text-muted">You reviewed this product</small>
+                            `);
+                            
+                            // Close modal
+                            $(`#reviewModal-${productId}`).modal('hide');
+                            toastr.success(response.message);
+                        } else {
+                            toastr.error(response.message);
+                        }
+                    },
+                    error: function() {
+                        toastr.error('Failed to submit review');
+                    }
+                });
+            });
+        });
+    </script>
+
+    <style>
+        .rating {
+            display: flex;
+            flex-direction: row-reverse;
+            justify-content: flex-end;
+        }
+
+        .rating-input {
+            display: none;
+        }
+
+        .rating-label {
+            cursor: pointer;
+            font-size: 25px;
+            color: #ddd;
+            margin: 0 2px;
+        }
+
+        .rating-label:hover,
+        .rating-label:hover ~ .rating-label,
+        .rating-input:checked ~ .rating-label {
+            color: #ffd700;
+        }
+
+        /* Reverse the hover effect */
+        .rating-label:hover:before,
+        .rating-label:hover ~ .rating-label:before,
+        .rating-input:checked ~ .rating-label:before {
+            content: '★';
+            position: absolute;
+        }
+    </style>
+} 

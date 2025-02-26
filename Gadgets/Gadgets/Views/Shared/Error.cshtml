@@ -1,0 +1,20 @@
+﻿@{
+    ViewData["Title"] = ViewBag.ErrorTitle ?? "Error";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center p-5">
+                    <i class="fas fa-exclamation-circle text-danger fa-4x mb-4"></i>
+                    <h1 class="h4 mb-3">@ViewBag.ErrorTitle</h1>
+                    <p class="text-muted mb-4">@ViewBag.ErrorMessage</p>
+                    <a asp-controller="Home" asp-action="Index" class="btn btn-primary rounded-pill px-4">
+                        <i class="fas fa-home me-2"></i>Return Home
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
